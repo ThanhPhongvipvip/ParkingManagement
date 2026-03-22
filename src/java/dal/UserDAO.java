@@ -1,57 +1,35 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package dal;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import model.User;
 
-/**
- *
- * @author ZunzZunn
- */
 public class UserDAO extends DBContext {
 
     public User checkLogin(String username, String password) {
-        // Chỉ cho phép tài khoản có trạng thái IsActive = 1 đăng nhập
         String sql = "SELECT * FROM Users WHERE Username = ? AND PasswordHash = ? AND IsActive = 1";
-
         try {
-            // Biến connection được kế thừa từ DBContext
             PreparedStatement st = connection.prepareStatement(sql);
             st.setString(1, username);
             st.setString(2, password);
             ResultSet rs = st.executeQuery();
-
-            // Nếu có kết quả trả về -> Đăng nhập thành công
             if (rs.next()) {
-                User user = new User(
-                        rs.getInt("UserID"),
-                        rs.getString("Username"),
-                        rs.getString("PasswordHash"),
-                        rs.getString("FullName"),
-                        rs.getString("PhoneNumber"),
-                        rs.getInt("RoleID"),
-                        rs.getBoolean("IsActive"),
-                        rs.getString("Email"),
-                        rs.getDate("DateOfBirth"),
-                        rs.getString("Avatar"),
-                        rs.getBoolean("IsEmailVerified")
+                return new User(
+                        rs.getInt("UserID"), rs.getString("Username"), rs.getString("PasswordHash"),
+                        rs.getString("FullName"), rs.getString("PhoneNumber"), rs.getInt("RoleID"),
+                        rs.getBoolean("IsActive"), rs.getString("Email"), rs.getDate("DateOfBirth"),
+                        rs.getString("Avatar"), rs.getBoolean("IsEmailVerified")
                 );
-                return user;
             }
         } catch (SQLException e) {
             System.out.println("Lỗi tại UserDAO: " + e.getMessage());
         }
-
-        return null; // Đăng nhập thất bại (sai user/pass hoặc tài khoản bị khóa)
+        return null;
     }
 
-    // Thêm tham số isEmailVerified vào hàm
     public boolean updateProfile(int userId, String fullName, String phoneNumber, String email, String dob, boolean isEmailVerified) {
         String sql = "UPDATE Users SET FullName = ?, PhoneNumber = ?, Email = ?, DateOfBirth = ?, IsEmailVerified = ? WHERE UserID = ?";
         try {
@@ -64,7 +42,7 @@ public class UserDAO extends DBContext {
             } else {
                 st.setNull(4, java.sql.Types.DATE);
             }
-            st.setBoolean(5, isEmailVerified); // Lưu trạng thái
+            st.setBoolean(5, isEmailVerified);
             st.setInt(6, userId);
             return st.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -73,14 +51,13 @@ public class UserDAO extends DBContext {
         return false;
     }
 
-    // 2. Đổi mật khẩu (Chỉ thành công khi mật khẩu cũ khớp)
     public boolean changePassword(int userId, String oldPassword, String newPassword) {
         String sql = "UPDATE Users SET PasswordHash = ? WHERE UserID = ? AND PasswordHash = ?";
         try {
             PreparedStatement st = connection.prepareStatement(sql);
             st.setString(1, newPassword);
             st.setInt(2, userId);
-            st.setString(3, oldPassword); // Điều kiện WHERE để check mật khẩu cũ
+            st.setString(3, oldPassword);
             return st.executeUpdate() > 0;
         } catch (SQLException e) {
             System.out.println("Lỗi tại changePassword: " + e.getMessage());
@@ -101,7 +78,6 @@ public class UserDAO extends DBContext {
         return false;
     }
 
-    // Kiểm tra trạng thái tài khoản để khôi phục mật khẩu
     public int checkUserEmail(String username, String email) {
         String sql = "SELECT IsEmailVerified FROM Users WHERE Username = ? AND Email = ? AND IsActive = 1";
         try {
@@ -109,18 +85,15 @@ public class UserDAO extends DBContext {
             st.setString(1, username);
             st.setString(2, email);
             ResultSet rs = st.executeQuery();
-
             if (rs.next()) {
-                // Trả về 1 nếu ĐÃ xác nhận, 0 nếu CHƯA xác nhận
                 return rs.getBoolean("IsEmailVerified") ? 1 : 0;
             }
         } catch (SQLException e) {
             System.out.println("Lỗi tại checkUserEmail: " + e.getMessage());
         }
-        return -1; // -1 nghĩa là sai Tên đăng nhập hoặc sai Email
+        return -1;
     }
 
-    // Đặt lại mật khẩu mới (Quên mật khẩu)
     public boolean resetPassword(String username, String newPassword) {
         String sql = "UPDATE Users SET PasswordHash = ? WHERE Username = ?";
         try {
@@ -134,9 +107,7 @@ public class UserDAO extends DBContext {
         return false;
     }
 
-    // 1. Kiểm tra xem Email đã bị người khác XÁC NHẬN chưa
     public boolean isEmailVerifiedByOther(String email, int currentUserId) {
-        // Chỉ trả về true nếu kẻ chiếm dụng đã có IsEmailVerified = 1
         String sql = "SELECT UserID FROM Users WHERE Email = ? AND UserID != ? AND IsEmailVerified = 1";
         try {
             PreparedStatement st = connection.prepareStatement(sql);
@@ -149,9 +120,7 @@ public class UserDAO extends DBContext {
         return false;
     }
 
-    // 2. Thu hồi Email từ kẻ chiếm dụng CHƯA xác nhận
     public void clearUnverifiedSquatter(String email) {
-        // Vì cột Email là NOT NULL và UNIQUE, ta sẽ đổi email của kẻ đó thành email rác
         String sql = "UPDATE Users SET Email = CAST(UserID AS VARCHAR) + '_revoked@iparking.local' WHERE Email = ? AND IsEmailVerified = 0";
         try {
             PreparedStatement st = connection.prepareStatement(sql);
@@ -162,7 +131,6 @@ public class UserDAO extends DBContext {
         }
     }
 
-    // Đánh dấu Email đã xác minh thành công
     public boolean markEmailVerified(int userId) {
         String sql = "UPDATE Users SET IsEmailVerified = 1 WHERE UserID = ?";
         try {
@@ -174,10 +142,10 @@ public class UserDAO extends DBContext {
         }
         return false;
     }
-    // 1. Lấy danh sách nhân viên (Giả sử RoleID 1 là Admin, 2 là Staff, bỏ qua Role User thường nếu có)
+
     public List<User> getAllStaff() {
-        List<User> list = new java.util.ArrayList<>();
-        String sql = "SELECT * FROM Users WHERE RoleID IN (1, 2)"; 
+        List<User> list = new ArrayList<>();
+        String sql = "SELECT * FROM Users WHERE RoleID IN (1, 2)";
         try {
             PreparedStatement st = connection.prepareStatement(sql);
             ResultSet rs = st.executeQuery();
@@ -195,25 +163,27 @@ public class UserDAO extends DBContext {
         return list;
     }
 
-    // 2. Thêm nhân viên mới
-    public boolean addStaff(String fullName, String username, String passwordHash, String phoneNumber, int roleId) {
-        // Mặc định tài khoản mới tạo ra là IsActive = 1 (True), IsEmailVerified = 0 (False)
-        String sql = "INSERT INTO Users (FullName, Username, PasswordHash, PhoneNumber, RoleID, IsActive, IsEmailVerified) VALUES (?, ?, ?, ?, ?, 1, 0)";
+    public String addStaff(String fullName, String username, String passwordHash, String phoneNumber, String email, int roleId) {
+        // Bỏ cột UserID ra vì SQL Server đã tự động đếm. Vẫn giữ Avatar rỗng để chống lỗi NOT NULL.
+        String sql = "INSERT INTO Users (FullName, Username, PasswordHash, PhoneNumber, Email, RoleID, IsActive, IsEmailVerified, Avatar) VALUES (?, ?, ?, ?, ?, ?, 1, 0, '')";
         try {
             PreparedStatement st = connection.prepareStatement(sql);
             st.setString(1, fullName);
             st.setString(2, username);
             st.setString(3, passwordHash);
             st.setString(4, phoneNumber);
-            st.setInt(5, roleId);
-            return st.executeUpdate() > 0;
+            st.setString(5, email);
+            st.setInt(6, roleId);
+            
+            st.executeUpdate(); // Chạy lệnh lưu
+            return "SUCCESS"; // Báo thành công
+            
         } catch (SQLException e) {
-            System.out.println("Lỗi tại addStaff: " + e.getMessage());
+            // Trả về đúng lời chửi của SQL Server nếu có lỗi khác
+            return "Lỗi CSDL: " + e.getMessage();
         }
-        return false;
     }
 
-    // 3. Khóa / Mở khóa tài khoản nhân viên
     public boolean toggleStaffStatus(int userId, boolean isActive) {
         String sql = "UPDATE Users SET IsActive = ? WHERE UserID = ?";
         try {
@@ -226,20 +196,31 @@ public class UserDAO extends DBContext {
         }
         return false;
     }
-    public boolean addStaff(String fullName, String username, String passwordHash, String phoneNumber, String email, int roleId) {
-        // Thêm trường Email vào câu lệnh INSERT
-        String sql = "INSERT INTO Users (FullName, Username, PasswordHash, PhoneNumber, Email, RoleID, IsActive, IsEmailVerified) VALUES (?, ?, ?, ?, ?, ?, 1, 0)";
+
+    public boolean updateStaff(int userId, String fullName, String phoneNumber, String email, int roleId) {
+        String sql = "UPDATE Users SET FullName = ?, PhoneNumber = ?, Email = ?, RoleID = ? WHERE UserID = ?";
         try {
             PreparedStatement st = connection.prepareStatement(sql);
             st.setString(1, fullName);
-            st.setString(2, username);
-            st.setString(3, passwordHash);
-            st.setString(4, phoneNumber);
-            st.setString(5, email); // Truyền giá trị Email vào dấu ? thứ 5
-            st.setInt(6, roleId);
+            st.setString(2, phoneNumber);
+            st.setString(3, email);
+            st.setInt(4, roleId);
+            st.setInt(5, userId);
             return st.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.out.println("Lỗi tại addStaff: " + e.getMessage());
+            System.out.println("Lỗi tại updateStaff: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public boolean deleteStaff(int userId) {
+        String sql = "DELETE FROM Users WHERE UserID = ?";
+        try {
+            PreparedStatement st = connection.prepareStatement(sql);
+            st.setInt(1, userId);
+            return st.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.out.println("Lỗi tại deleteStaff: " + e.getMessage());
         }
         return false;
     }
